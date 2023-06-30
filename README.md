@@ -356,7 +356,7 @@ access(all) resource interface SpecialProvider {
     }
 }
 access(all) resource SpecialVault: SpecialBalance, SpecialReceiver, SpecialProvider {
-    // some implementation
+    // Some implementation
 
     access(all) fun subscribe() {
         Bank.subscribed() // Valid from (SpecialBalance & SpecialReceiver & SpecialProvider)
