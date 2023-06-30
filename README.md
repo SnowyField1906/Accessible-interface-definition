@@ -205,33 +205,62 @@ This proposal also allows us to use `define` on Resource Interfaces, which behav
 
 ### Sample use cases
 
+This proposal suggests introducing the ability for Contracts to inherit specific Interfaces in order to determine their validity. \
+However, merely filtering Contracts based on Interfaces does not imply filtering their algorithms or implementations, which can make the system vulnerable to manipulation or falsification.
+
+To address this, we can enhance control over the underlying by imposing additional restrictions in the following ways:
+
+- **Enhancing Interfaces**: We can enhance interfaces by incorporating `pre` and `post` conditions in order to ensure the desired behavior before and after the execution of the caller function.
+
+- **Utilizing caller Contract accessibility**: Since we can access the caller Contract within the `define` scope, it becomes possible to apply further restrictions using `assert()` conditions there.
+
 #### Example 1
+
+> In this example, we demonstrate how to restrict access to functions using enhanced Interfaces.
+
+Supposes we have a `Vault` Contract with a `Vault._swap()` function which should be restricted to be callable only by either `Plugin` or `Router` Contracts.
 
 ```cadence
 // Vault.cdc
-define PoolPlugin from IPlugin { }
+define Plugin from IPlugin { }
 
 access(all) contract Vault {
-    access(PoolPlugin | Router) fun _swap(from: @FungibleToken.Vault): @FungibleToken.Vault;
+    access(Plugin | Router) fun _swap(from: @FungibleToken.Vault, expectedAmount: UFix64): @FungibleToken.Vault;
     access(all) fun exactInput(amountIn: UFix64): UFix64;
 }
+```
 
+In the `IPlugin` Interface, we enhance the `Plugin.swap()` function with a `post` condition. This condition ensures that: \
+Whenever the fake `Plugin` makes a call to the `Vault._swap()` function in order to withdraw an amount of Fungible Token, the returned value is always the same as the expected amount, regardless of any manipulation in the code logic.
+
+```cadence
 // IPlugin.cdc
 access(all) contract interface IPlugin {
-    access(contract) fun _swap(from: @FungibleToken.Vault): @FungibleToken.Vault {
+    access(all) fun swap(from: @FungibleToken.Vault, expectedAmount: UFix64): @FungibleToken.Vault {
+        pre {
+            expectedAmount == Vault.exactInput(amountIn: from.balance): "Not enough amount"
+        }
         post {
-            result.balance == Vault.exactInput(amountIn: from.balance): "You cheated!!"
+            expectedAmount == result.balance: "You cheated!!"
         }
     }
 }
+```
+
+Now, let's explore how a malicious `Plugin` Contract attempts to cheat the system by withdrawing half of the received Fungible Token during the swap.
+
+```cadence
 // Plugin.cdc
 access(all) contract Plugin: IPlugin {
-    access(contract) fun _swap(from: @FungibleToken.Vault): @FungibleToken.Vault {
-        let to: @FungibleToken = Vault._swap(from: <- from) // Valid from IPlugin
+    access(all) fun anotherInvalidSwap(from: @FungibleToken.Vault): @FungibleToken.Vault {
+        let to: @FungibleToken = Vault._swap(from: <- from, expectedAmount: 0.01) // -> pre-condition failed: Not enough amount
+    }
+    access(all) fun invalidSwap(from: @FungibleToken.Vault): @FungibleToken.Vault {
+        let to: @FungibleToken = Vault._swap(from: <- from, expectedAmount: someAmount) // Valid from IPlugin
 
         to.withdraw(amount: to.balance / 2.0) // Cheat half of the amount
 
-        return to; // -> post-condition failed: You cheated!!
+        return to // -> post-condition failed: You cheated!!
     }
 }
 ```
@@ -366,83 +395,82 @@ access(all) resource SpecialVault: SpecialBalance, SpecialReceiver, SpecialProvi
 
 ### Drawbacks
 
->Why should this *not* be done? What negative impact does it have? 
+>Why should this *not* be done? What negative impact does it have?
+
+Since the [`entitlement` FLIP](https://github.com/onflow/flips/blob/main/cadence/20221214-auth-remodel.md) was approved, this might cause some confusion and conficts in syntax and semantics.
 
 ### Alternatives Considered
 
-* Make sure to discuss the relative merits of alternatives to your proposal.
+> Make sure to discuss the relative merits of alternatives to your proposal.
+
 
 ### Performance Implications
 
-* Do you expect any (speed / memory)? How will you confirm?
-* There should be microbenchmarks. Are there?
-* There should be end-to-end tests and benchmarks. If there are not 
-(since this is still a design), how will you track that these will be created?
+> Do you expect any (speed / memory)? How will you confirm?
+
+> There should be microbenchmarks. Are there?
+
+> There should be end-to-end tests and benchmarks. If there are not (since this is still a design), how will you track that these will be created?
 
 ### Dependencies
 
-* Dependencies: does this proposal add any new dependencies to Flow?
-* Dependent projects: are there other areas of Flow or things that use Flow 
+> Dependencies: does this proposal add any new dependencies to Flow?
+
+> Dependent projects: are there other areas of Flow or things that use Flow 
+
 (Access API, Wallets, SDKs, etc.) that this affects? 
 How have you identified these dependencies and are you sure they are complete? 
 If there are dependencies, how are you managing those changes?
 
 ### Engineering Impact
 
-* Do you expect changes to binary size / build time / test times?
-* Who will maintain this code? Is this code in its own buildable unit? 
+> Do you expect changes to binary size / build time / test times?
+
+> Who will maintain this code? Is this code in its own buildable unit?
+
 Can this code be tested in its own? 
 Is visibility suitably restricted to only a small API surface for others to use?
 
 ### Best Practices
 
-* Does this proposal change best practices for some aspect of using/developing Flow? 
+> Does this proposal change best practices for some aspect of using/developing Flow?
+
 How will these changes be communicated/enforced?
 
 ### Tutorials and Examples
 
-* If design changes existing API or creates new ones, the design owner should create 
-end-to-end examples (ideally, a tutorial) which reflects how new feature will be used. 
-Some things to consider related to the tutorial:
-    - It should show the usage of the new feature in an end to end example 
-    (i.e. from the browser to the execution node). 
-    Many new features have unexpected effects in parts far away from the place of 
-    change that can be found by running through an end-to-end example.
-    - This should be written as if it is documentation of the new feature, 
-    i.e., consumable by a user, not a Flow contributor. 
-    - The code does not need to work (since the feature is not implemented yet) 
-    but the expectation is that the code does work before the feature can be merged. 
+> If design changes existing API or creates new ones, the design owner should create end-to-end examples (ideally, a tutorial) which reflects how new feature will be used. Some things to consider related to the tutorial:
+> - It should show the usage of the new feature in an end to end example (i.e. from the browser to the execution node). Many new features have unexpected effects in parts far away from the place of change that can be found by running through an end-to-end example.
+> - This should be written as if it is documentation of the new feature, i.e., consumable by a user, not a Flow contributor.
+> - The code does not need to work (since the feature is not implemented yet) but the expectation is that the code does work before the feature can be merged.
 
 ### Compatibility
 
-* Does the design conform to the backwards & forwards compatibility [requirements](../docs/compatibility.md)?
-* How will this proposal interact with other parts of the Flow Ecosystem?
-    - How will it work with FCL?
-    - How will it work with the Emulator?
-    - How will it work with existing Flow SDKs?
+> Does the design conform to the backwards & forwards compatibility [requirements](../docs/compatibility.md)?
+
+> How will this proposal interact with other parts of the Flow Ecosystem?
+> - How will it work with FCL?
+> - How will it work with the Emulator?
+> - How will it work with existing Flow SDKs?
 
 ### User Impact
 
-* What are the user-facing changes? How will this feature be rolled out?
+> What are the user-facing changes? How will this feature be rolled out?
 
 ## Related Issues
 
-What related issues do you consider out of scope for this proposal, 
-but could be addressed independently in the future?
+> What related issues do you consider out of scope for this proposal, but could be addressed independently in the future?
 
 ## Prior Art
 
-Does the proposed idea/feature exist in other systems and 
-what experience has their community had?
+> Does the proposed idea/feature exist in other systems and what experience has their community had?
 
-This section is intended to encourage you as an author to think about the 
-lessons learned from other projects and provide readers of the proposal 
-with a fuller picture.
+> This section is intended to encourage you as an author to think about the lessons learned from other projects and provide readers of the proposal with a fuller picture.
 
-It's fine if there is no prior art; your ideas are interesting regardless of 
-whether or not they are based on existing work.
+> It's fine if there is no prior art; your ideas are interesting regardless of whether or not they are based on existing work.
 
 ## Questions and Discussion Topics
 
-Seed this with open questions you require feedback on from the FLIP process. 
-What parts of the design still need to be defined?
+> Seed this with open questions you require feedback on from the FLIP process.
+
+> What parts of the design still need to be defined?
