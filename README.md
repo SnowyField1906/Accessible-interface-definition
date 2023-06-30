@@ -1,31 +1,31 @@
 ---
 status: draft 
-flip: NNN (set to PR number)
+flip: 117
 authors: Huu Thuan Nguyen (nguyenhuuthuan25112003@gmail.com) 
-sponsor: AN Expert (core-contributor@example.org)
-updated: YYYY-MM-DD 
+sponsor: None
+updated: 2023-06-30
 ---
 
-# FLIP NNN: Accessible Interface Definition
+# FLIP 117: Accessible Interface Definition
 
 ## Objective
 
 > What are we doing and why? What problem will this solve? What are the goals and non-goals? This is your executive summary; keep it short, elaborate below.
 
-This FLIP proposes to allow functions to define which contracts are able to call them based on the interfaces those contracts inherited.
+This FLIP proposes the implementation of a feature that allows functions to define which Contracts can call them based on the Interfaces those Contracts inherit.
 
-This makes it easier for developers to build huge project with multiple parallel smart contracts along with complex access control rules.
+The objective is to simplify the development of large-scale projects with multiple parallel Contracts that require complex access control rules.
 
 ## Motivation
 
 > Why is this a valuable problem to solve? What background information is needed to show how this design addresses the problem?
 > Which users are affected by the problem? Why is it a problem? What data supports this? What related work exists?
 
-Flow made the bold move of removing `msg.sender` and replacing it with the Capability system defined by Resource. This seems to work very effectively and brings many benefits to small projects, but that efficiency is inversely proportional to the size and complexity of the project. While `msg.sender` proved to be much more efficient in these case.
+Flow introduced the Capability system, which replaced `msg.sender` and proved to be effective for small projects. However, as projects grow in size and complexity, the efficiency of the Capability system decreases compared to the use of `msg.sender`.
 
-Let's come up with a specific example below:
+To illustrate the issue, let's consider a specific example. Suppose we have a `Vault` Contract with a function called `swap()`, which should only be called by the `Core` Contract or `Router` Contracts. Currently, the following approaches can be used:
 
-Supposes that the `Vault` contract has a function called `Vault.swap()` which should be called by the `Core` contract or `Router` contracts only. This is what we can do with the current Flow:
+
 
 ```cadence
 access(all) contract Vault {
@@ -45,7 +45,9 @@ access(all) contract Vault {
 }
 ```
 
-Way 1: Save the `Admin` Resource to the `Router` deployer account.
+Currently, we can achieve this with Flow using different approaches:
+
+Approach 1: Saving the `Admin` Resource to the `Router` deployer account.
 
 ```cadence
 access(all) contract Router {
@@ -55,7 +57,7 @@ access(all) contract Router {
 }
 ```
 
-Way 2: Save the `Admin` Capability to the `Router` deployer account.
+Approach 2: Saving the `Admin` Capability to the `Router` Contract.
 
 ```cadence
 access(all) contract Router {
@@ -71,48 +73,62 @@ access(all) contract Router {
 }
 ```
 
-In any way, we all have to operate with `Admin` resource, this leads to the following problems:
+However, both approaches have drawbacks:
 
-- The `Admin` resource definition makes the amount of code bigger, harder to maintain and update.
-- Every time we want to add a new `Router` contract, we have to operate with Vault deployer account. This makes it less decentralized with many unnecessary steps.
-- What if the project becomes bigger with multiple contracts and it needs more complex access control rules? We have to create more resources and more code to handle them.
+- The `Admin` Resource definition increases the code size and makes maintenance and updates more challenging.
+- Adding a new `Router` Contract requires operating with the `Vault` deployer account, reducing decentralization and introducing unnecessary steps.
+- As projects become larger and require more complex access control rules, the need for additional Resources meeting some specific requirements increases, which leads to a more significant increase in code size.
 
 ## User Benefit
 
 > How will users (or other contributors) benefit from this work? What would be the headline in the release notes or blog post?
 
-This proposal is aimed at making contracts more decentralized, independent of the deployer account. This will be easier to manage and friendly to high complexity projects.
+This proposal is aimed at making Contracts more decentralized, independent of the deployer account. This will be easier to manage and friendly to high complexity projects.
 
 ## Design Proposal
 
 > This is the meat of the document where you explain your proposal. If you have multiple alternatives, be sure to use sub-sections for better separation of the idea, and list pros/cons to each approach. If there are alternatives that you have eliminated, you should also list those here, and explain why you believe your chosen approach is superior.
 > Make sure you’ve thought through and addressed the following sections. If a  section is not relevant to your specific proposal, please explain why, e.g.  your FLIP addresses a convention or process, not an API.
 
+The proposed design introduces the following enhancements:
+
 ### Declaration keywords
 
-#### `define` keyword
+#### The `define` keyword
 
 Example:
 
 ```cadence
+// Define an alias for a Contract Interface
 define ContractAlias from ContractInterface {
-    // in this scope, we can access to the caller contract by `ContractAlias`.
-    // which will be clear in the next sections.
+    // Within this scope, the caller Contract can be accessed using `ContractAlias`.
+    // This allows us to interact with the caller Contract and leverage its capabilities.
 }
 ```
 
-#### `access` keyword improvements
+The `define` keyword is used to create an alias for a Contract Interface. \
+By defining an alias, we can access the caller Contract within the scope of the definition.
 
-After declare a definition, we can use `access` keyword to define which interfaces are able to call the function.
-Note that the `access(ContractX)` has wider scope than `access(self)`, which means that it also can be called in the parent contract.
+Once it is possible to access the caller Contract and utilize its functionalities, developers can build powerful features and implement complex logic to ensure Contract security besides enhance the flexibility and extensibility of Contracts.
+
+#### Improvements to the `access` keyword
+
+After declaring definitions, the aliases can be used by the `access` keyword to specify which Interfaces are allowed to call a function.
+
+Note that `access(ContractX)` has a wider scope than `access(self)`, meaning that it can also be called in the parent Contract.
 
 ```cadence
+// FooContract.cdc
 access(ContractX) fun foo() { }
+self.foo() // Okay
 
-self.foo() // ok
+// BarContract.cdc
+access(all) contract BarContract: IContractX {
+    FooContract.foo() // Okay
+}
 ```
 
-If we want to make `foo()` callable in the inner contract, we can also combine the alias with `contract` by the `|` operator (more details below).
+To make `foo()` callable within the inner Contract, the alias can be combined with `contract` by using the `|` operator (details provided below).
 
 ```cadence
 // FooContract.cdc
@@ -120,14 +136,14 @@ access(ContractX | contract) fun foo() { }
 
 access(all) resource Foo() {
     access(all) fun bar() {
-        FooContract.foo() // ok
+        FooContract.foo() // Okay
     }
 }
 ```
 
-#### `|` and `&` operator
+#### The `|` and `&` operators
 
-As mentioned above, we can combine more than one interface by the `|` operator. This is useful when we want to make a function callable in multiple contracts.
+As mentioned above, the proposed design allows the combination of multiple Interfaces using the `|` operator. This is useful when a function should be callable by multiple Contracts.
 
 ```cadence
 // FooContract.cdc
@@ -135,11 +151,11 @@ access(ContractX | ContractY | ContractZ) fun foo() { }
 
 // BarContract.cdc
 access(all) contract BarContract: IContractY, IContractZ {
-    FooContract.foo() // ok
+    FooContract.foo() // Okay
 }
 ```
 
-This also works with the `&` operator, which means that the function can be called by the contracts that implement all of the interfaces.
+Additionally, the `&` operator can be used to specify that the function can only be called by Contracts that implement all of the Interfaces included.
 
 ```cadence
 // FooContract.cdc
@@ -147,12 +163,169 @@ access(ContractX & ContractY & ContractZ) fun foo() { }
 
 // BarContract.cdc
 access(all) contract BarContract: IContractY, IContractZ {
-    FooContract.foo() // inaccessible
+    FooContract.foo() // Inaccessible
 }
 
 // SuperBarContract.cdc
 access(all) contract SuperBarContract: IContractX, IContractY, IContractZ {
-    FooContract.foo() // ok
+    FooContract.foo() // Okay
+}
+```
+
+### Resource integration
+
+This proposal also allows us to use `define` on Resource Interfaces, which behaves mostly same with `entitlements` but not though Resource and Capability types.
+
+### Specific use cases
+
+#### Example 1
+
+```cadence
+import IPlugin from "IPlugin"
+
+define PoolPlugin from IPlugin { } // do not have conditions
+
+access(all) contract Vault {
+    access(PoolPlugin | Router) fun _swap(from: @FungibleToken.Vault): @FungibleToken.Vault;
+    access(all) fun exactInput(amountIn: UFix64): UFix64;
+}
+
+access(all) contract interface IPlugin {
+    access(contract) fun _swap(from: @FungibleToken.Vault): @FungibleToken.Vault {
+        post {
+            result.balance == Vault.exactInput(amountIn: from.balance): "You cheated!!"
+        }
+    }
+}
+access(all) contract Plugin: IPlugin {
+    access(contract) fun _swap(from: @FungibleToken.Vault): @FungibleToken.Vault {
+        let to: @FungibleToken = Vault._swap(from: <- from) // always valid from IPlugin
+
+        to.withdraw(amount: to.balance / 2.0) // cheat half of the amount
+
+        return to; // post-condition failed: You cheated!!
+    }
+}
+```
+
+#### Example 2
+
+```cadence
+import IConsensus from "IConsensus"
+
+define Consensus from IConsensus { } // do not have conditions
+
+access(all) contract Nodes {
+    access(Collection | Consensus | Execution | Verification) fun receivedTx();
+}
+
+access(all) contract interface IConsensus {
+    access(all) fun validate(tx: @Transaction): @Transaction {
+        pre {
+            tx.collected() == true: "Send this transaction to Collection Node first"
+            tx.validated() == false: "This transaction is already executed"
+        }
+        post {
+            tx.validated() == true: "This transaction is not validated"
+        }
+    }
+}
+access(all) contract Consensus: IConsensus {
+    access(all) fun validate(tx: @Transaction): @Transaction {
+        Nodes.receivedTx() // always valid from IConsensus
+
+        // ... do something to make tx.validated() == true
+
+        return <- validatedTx
+    }
+}
+```
+
+#### Example 3
+
+```cadence
+import IConsensus from "IConsensus"
+import IExecution from "IExecution"
+
+define Consensus from IConsensus { } // do not have conditions
+define Execution from IExecution {
+    let exeAddr: Address = Execution.account.address
+    assert(Nodes.validExecutions.exists(exeAddr), message: "Execution is not valid")
+
+    let balance: UFix64 = getAccount(Execution.account.address)
+        .capabilities
+        .get<&{FungibleToken.Balance}>(/public/flowTokenBalance)
+        .borrow()!
+    assert(balance >= Nodes.minimumStaked: "Execution is not staked enough")
+}
+
+
+access(all) contract Nodes {
+    access(Collection | Consensus | Execution | Verification) fun receivedTx();
+
+
+    access(all) let validExecutions: [Address] = [0x01]
+    access(all) let MINIMUM_STAKED: UFix64 = 1250000.0
+
+    access(Router | GOV) fun addExecution(execution: Address);
+    access(Collection | Consensus | Execution | Verification) fun withdrawn();
+
+    access(Execution) fun executed();
+}
+
+access(all) contract InvalidExecution: IExecution { // deployed at 0x02
+    access(all) fun execute() {
+        Nodes.executed() // assertion failed: Execution is not valid
+    }
+}
+access(all) contract PoorExecution: IExecution { // deployed at 0x01 and had less than 1.250.000 Flow
+    access(all) fun execute() {
+        Nodes.executed() // assertion failed: Execution is not staked enough
+    }
+}
+access(all) contract ValidExecution: IExecution { //deployed at 0x01 and had over 1.250.000 Flow
+    access(all) fun execute() {
+        Nodes.executed() // valid
+    }
+}
+```
+
+#### Example 4
+
+```cadence
+define Balance from SpecialBalance { }
+define Receiver from SpecialReceiver { }
+define Provider from SpecialProvider { }
+
+access(all) contract Bank {
+    access(Balance) fun getInterest(): UFix64;
+
+    access(Provider) fun withdrawAll();
+
+    access(Balance & Receiver & Provider) fun subscribed()
+}
+
+access(all) resource interface SpecialBalance {
+    access(all) fun getAvailableBalance(): UFix64;
+
+    access(all) fun getAllPossibleBalance(): UFix64 {
+        return self.getAvailableBalance() + Bank.getInterest() // always valid from Balance
+    }
+}
+access(all) resource interface SpecialProvider {
+    access(all) fun withdraw(amount: UFix64): @FungibleToken.Vault;
+
+    access(all) fun withdrawAll(): @FungibleToken.Vault {
+        Bank.withdrawAll() // always valid from Provider
+        /// ... some implementation
+    }
+}
+access(all) resource SpecialVault: Balance, Receiver, Provider {
+    // some implementation
+
+    access(all) fun subscribe() {
+        Bank.subscribed() // always valid from Balance & Receiver & Provider
+    }
 }
 ```
 
