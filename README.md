@@ -21,11 +21,10 @@ The objective is to simplify the development of large-scale projects with multip
 > Why is this a valuable problem to solve? What background information is needed to show how this design addresses the problem?
 > Which users are affected by the problem? Why is it a problem? What data supports this? What related work exists?
 
-Flow introduced the Capability system, which replaced `msg.sender` and proved to be effective for small projects. However, as projects grow in size and complexity, the efficiency of the Capability system decreases compared to the use of `msg.sender`.
+Flow introduced the Capability system, which replaced `msg.sender` and proved to be effective for small projects. \
+However, as projects grow in size and complexity, the efficiency of the Capability system decreases compared to the use of `msg.sender`.
 
-To illustrate the issue, let's consider a specific example. Suppose we have a `Vault` Contract with a function called `swap()`, which should only be called by the `Core` Contract or `Router` Contracts. Currently, the following approaches can be used:
-
-
+To illustrate the issue, let's consider a specific example. Suppose we have a `Vault` Contract with a function called `swap()`, which should only be called by the `Core` Contract or `Router` Contracts.
 
 ```cadence
 access(all) contract Vault {
@@ -88,6 +87,7 @@ This proposal is aimed at making Contracts more decentralized, independent of th
 ## Design Proposal
 
 > This is the meat of the document where you explain your proposal. If you have multiple alternatives, be sure to use sub-sections for better separation of the idea, and list pros/cons to each approach. If there are alternatives that you have eliminated, you should also list those here, and explain why you believe your chosen approach is superior.
+
 > Make sure you’ve thought through and addressed the following sections. If a  section is not relevant to your specific proposal, please explain why, e.g.  your FLIP addresses a convention or process, not an API.
 
 The proposed design introduces the following enhancements:
@@ -143,7 +143,7 @@ access(all) resource Foo() {
 
 #### The `|` and `&` operators
 
-These two operators are used to combine multiple Interfaces according to by Boolean logic.
+These two operators are used to combine multiple Interfaces according to Boolean logic.
 
 As mentioned above, the proposed design allows the combination of multiple Interfaces using the `|` operator. This is useful when a function should be callable by multiple Contracts.
 
@@ -180,7 +180,7 @@ The `group..as` keyword introduces a convenient way to define a group of Interfa
 This allows for a concise reference to the combined Interfaces.
 
 To create such a shorthand reference, the `group` keyword is utilized, followed by a combination of Interfaces according to Boolean logic. \
-Subsequently, the `as` keyword is employed, followed by the desired alias.
+Subsequently, the `as` keyword is utilized, followed by the desired alias.
 
 ```cadence
 // FooContract.cdc
