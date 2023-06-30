@@ -120,11 +120,11 @@ Note that `access(ContractX)` has a wider scope than `access(self)`, meaning tha
 ```cadence
 // FooContract.cdc
 access(ContractX) fun foo() { }
-self.foo() // Okay
+self.foo() // Valid
 
 // BarContract.cdc
 access(all) contract BarContract: IContractX {
-    FooContract.foo() // Okay
+    FooContract.foo() // Valid
 }
 ```
 
@@ -136,12 +136,14 @@ access(ContractX | contract) fun foo() { }
 
 access(all) resource Foo() {
     access(all) fun bar() {
-        FooContract.foo() // Okay
+        FooContract.foo() // Valid
     }
 }
 ```
 
 #### The `|` and `&` operators
+
+These two operators are used to combine multiple Interfaces according to by Boolean logic.
 
 As mentioned above, the proposed design allows the combination of multiple Interfaces using the `|` operator. This is useful when a function should be callable by multiple Contracts.
 
@@ -151,7 +153,7 @@ access(ContractX | ContractY | ContractZ) fun foo() { }
 
 // BarContract.cdc
 access(all) contract BarContract: IContractY, IContractZ {
-    FooContract.foo() // Okay
+    FooContract.foo() // Valid
 }
 ```
 
@@ -168,7 +170,32 @@ access(all) contract BarContract: IContractY, IContractZ {
 
 // SuperBarContract.cdc
 access(all) contract SuperBarContract: IContractX, IContractY, IContractZ {
-    FooContract.foo() // Okay
+    FooContract.foo() // Valid
+}
+```
+
+#### The `group..as` keyword
+
+The `group..as` keyword introduces a convenient way to define a group of Interfaces as a single alias, particularly when there are multiple Interfaces that need to be combined. \
+This allows for a concise reference to the combined Interfaces.
+
+To create such a shorthand reference, the `group` keyword is utilized, followed by a combination of Interfaces according to Boolean logic. \
+Subsequently, the `as` keyword is employed, followed by the desired alias.
+
+```cadence
+// FooContract.cdc
+group (Developer | Designer) & Available as Candidate
+
+access(Candidate) fun foo() { }
+
+// NotAvailableForWork.cdc
+access(all) contract NotAvailableForWork: Developer, Designer {
+    FooContract.foo() // Inaccessible
+}
+
+// Candidate.cdc
+access(all) contract Candidate: Developer, Available {
+    FooContract.foo() // Valid
 }
 ```
 
@@ -176,20 +203,20 @@ access(all) contract SuperBarContract: IContractX, IContractY, IContractZ {
 
 This proposal also allows us to use `define` on Resource Interfaces, which behaves mostly same with `entitlements` but not though Resource and Capability types.
 
-### Specific use cases
+### Sample use cases
 
 #### Example 1
 
 ```cadence
-import IPlugin from "IPlugin"
-
-define PoolPlugin from IPlugin { } // do not have conditions
+// Vault.cdc
+define PoolPlugin from IPlugin { }
 
 access(all) contract Vault {
     access(PoolPlugin | Router) fun _swap(from: @FungibleToken.Vault): @FungibleToken.Vault;
     access(all) fun exactInput(amountIn: UFix64): UFix64;
 }
 
+// IPlugin.cdc
 access(all) contract interface IPlugin {
     access(contract) fun _swap(from: @FungibleToken.Vault): @FungibleToken.Vault {
         post {
@@ -197,13 +224,14 @@ access(all) contract interface IPlugin {
         }
     }
 }
+// Plugin.cdc
 access(all) contract Plugin: IPlugin {
     access(contract) fun _swap(from: @FungibleToken.Vault): @FungibleToken.Vault {
-        let to: @FungibleToken = Vault._swap(from: <- from) // always valid from IPlugin
+        let to: @FungibleToken = Vault._swap(from: <- from) // Valid from IPlugin
 
-        to.withdraw(amount: to.balance / 2.0) // cheat half of the amount
+        to.withdraw(amount: to.balance / 2.0) // Cheat half of the amount
 
-        return to; // post-condition failed: You cheated!!
+        return to; // -> post-condition failed: You cheated!!
     }
 }
 ```
@@ -211,14 +239,14 @@ access(all) contract Plugin: IPlugin {
 #### Example 2
 
 ```cadence
-import IConsensus from "IConsensus"
-
-define Consensus from IConsensus { } // do not have conditions
+// Nodes.cdc
+define Consensus from IConsensus { }
 
 access(all) contract Nodes {
     access(Collection | Consensus | Execution | Verification) fun receivedTx();
 }
 
+// IConsensus.cdc
 access(all) contract interface IConsensus {
     access(all) fun validate(tx: @Transaction): @Transaction {
         pre {
@@ -230,13 +258,14 @@ access(all) contract interface IConsensus {
         }
     }
 }
+// Consensus.cdc
 access(all) contract Consensus: IConsensus {
     access(all) fun validate(tx: @Transaction): @Transaction {
-        Nodes.receivedTx() // always valid from IConsensus
+        Nodes.receivedTx() // Valid from IConsensus
 
-        // ... do something to make tx.validated() == true
+        // Do something to make tx.validated() == true
 
-        return <- validatedTx
+        return <- validatedTx // Valid
     }
 }
 ```
@@ -244,10 +273,8 @@ access(all) contract Consensus: IConsensus {
 #### Example 3
 
 ```cadence
-import IConsensus from "IConsensus"
-import IExecution from "IExecution"
-
-define Consensus from IConsensus { } // do not have conditions
+// Nodes.cdc
+define Consensus from IConsensus { }
 define Execution from IExecution {
     let exeAddr: Address = Execution.account.address
     assert(Nodes.validExecutions.exists(exeAddr), message: "Execution is not valid")
@@ -259,10 +286,8 @@ define Execution from IExecution {
     assert(balance >= Nodes.minimumStaked: "Execution is not staked enough")
 }
 
-
 access(all) contract Nodes {
     access(Collection | Consensus | Execution | Verification) fun receivedTx();
-
 
     access(all) let validExecutions: [Address] = [0x01]
     access(all) let MINIMUM_STAKED: UFix64 = 1250000.0
@@ -273,19 +298,25 @@ access(all) contract Nodes {
     access(Execution) fun executed();
 }
 
-access(all) contract InvalidExecution: IExecution { // deployed at 0x02
+// InvalidExecution.cdc
+// Deployed at 0x02
+access(all) contract InvalidExecution: IExecution {
     access(all) fun execute() {
-        Nodes.executed() // assertion failed: Execution is not valid
+        Nodes.executed() // -> assertion failed: Execution is not valid
     }
 }
-access(all) contract PoorExecution: IExecution { // deployed at 0x01 and had less than 1.250.000 Flow
+// PoorExecution.cdc
+// Deployed at 0x01 and had less than 1.250.000 Flow
+access(all) contract PoorExecution: IExecution {
     access(all) fun execute() {
-        Nodes.executed() // assertion failed: Execution is not staked enough
+        Nodes.executed() // -> assertion failed: Execution is not staked enough
     }
 }
-access(all) contract ValidExecution: IExecution { //deployed at 0x01 and had over 1.250.000 Flow
+// ValidExecution.cdc
+// Deployed at 0x01 and had over 1.250.000 Flow
+access(all) contract ValidExecution: IExecution {
     access(all) fun execute() {
-        Nodes.executed() // valid
+        Nodes.executed() // Valid
     }
 }
 ```
@@ -293,38 +324,42 @@ access(all) contract ValidExecution: IExecution { //deployed at 0x01 and had ove
 #### Example 4
 
 ```cadence
+// Bank.cdc
 define Balance from SpecialBalance { }
 define Receiver from SpecialReceiver { }
 define Provider from SpecialProvider { }
+
+group (Balance & Receiver & Provider) as Vault
 
 access(all) contract Bank {
     access(Balance) fun getInterest(): UFix64;
 
     access(Provider) fun withdrawAll();
 
-    access(Balance & Receiver & Provider) fun subscribed()
+    access(Vault) fun subscribed()
 }
 
+// BankVault.cdc
 access(all) resource interface SpecialBalance {
     access(all) fun getAvailableBalance(): UFix64;
 
     access(all) fun getAllPossibleBalance(): UFix64 {
-        return self.getAvailableBalance() + Bank.getInterest() // always valid from Balance
+        return self.getAvailableBalance() + Bank.getInterest() // Valid from SpecialBalance
     }
 }
 access(all) resource interface SpecialProvider {
     access(all) fun withdraw(amount: UFix64): @FungibleToken.Vault;
 
     access(all) fun withdrawAll(): @FungibleToken.Vault {
-        Bank.withdrawAll() // always valid from Provider
-        /// ... some implementation
+        Bank.withdrawAll() // Valid from Provider
+        // Some implementation
     }
 }
-access(all) resource SpecialVault: Balance, Receiver, Provider {
+access(all) resource SpecialVault: SpecialBalance, SpecialReceiver, SpecialProvider {
     // some implementation
 
     access(all) fun subscribe() {
-        Bank.subscribed() // always valid from Balance & Receiver & Provider
+        Bank.subscribed() // Valid from (SpecialBalance & SpecialReceiver & SpecialProvider)
     }
 }
 ```
