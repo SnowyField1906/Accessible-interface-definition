@@ -21,10 +21,10 @@ The objective is to simplify the development of large-scale projects with multip
 > Why is this a valuable problem to solve? What background information is needed to show how this design addresses the problem?
 > Which users are affected by the problem? Why is it a problem? What data supports this? What related work exists?
 
-Flow introduced the Capability system, which replaced `msg.sender` and proved to be effective for small projects. \
+Flow introduced Cadence - a Resource-Oriented Programming Language which works towards the Capability system, it replaced `msg.sender` and proved to be effective for small projects. \
 However, as projects grow in size and complexity, the efficiency of the Capability system decreases compared to the use of `msg.sender`.
 
-To illustrate the issue, let's consider a specific example. Suppose we have a `Vault` Contract with a function called `swap()`, which should only be called by the `Core` Contract or `Router` Contracts.
+To illustrate the issue, let's consider a specific example. Suppose we have a `Vault` Contract with a function called `Vault.swap()`, which should only be called by the `Core` Contract or `Router` Contracts.
 
 ```cadence
 access(all) contract Vault {
