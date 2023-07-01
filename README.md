@@ -419,26 +419,17 @@ Since the [`entitlement` FLIP](https://github.com/onflow/flips/blob/main/cadence
 
 > Dependencies: does this proposal add any new dependencies to Flow?
 
-> Dependent projects: are there other areas of Flow or things that use Flow 
-
-(Access API, Wallets, SDKs, etc.) that this affects? 
-How have you identified these dependencies and are you sure they are complete? 
-If there are dependencies, how are you managing those changes?
+> Dependent projects: are there other areas of Flow or things that use Flow  (Access API, Wallets, SDKs, etc.) that this affects? How have you identified these dependencies and are you sure they are complete?  If there are dependencies, how are you managing those changes?
 
 ### Engineering Impact
 
 > Do you expect changes to binary size / build time / test times?
 
-> Who will maintain this code? Is this code in its own buildable unit?
-
-Can this code be tested in its own? 
-Is visibility suitably restricted to only a small API surface for others to use?
+> Who will maintain this code? Is this code in its own buildable unit? Can this code be tested in its own?  Is visibility suitably restricted to only a small API surface for others to use?
 
 ### Best Practices
 
-> Does this proposal change best practices for some aspect of using/developing Flow?
-
-How will these changes be communicated/enforced?
+> Does this proposal change best practices for some aspect of using/developing Flow? How will these changes be communicated/enforced?
 
 ### Tutorials and Examples
 
