@@ -216,7 +216,7 @@ To address this, we can enhance control over the underlying by imposing addition
 
 #### Example 1
 
-> In this example, we demonstrate how to restrict access to functions using enhanced Interfaces.
+In this example, we demonstrate how to restrict access to functions using enhanced Interfaces.
 
 Supposes we have a `Vault` Contract with a `Vault._swap()` function which should be restricted to be callable only by either `Plugin` or `Router` Contracts.
 
