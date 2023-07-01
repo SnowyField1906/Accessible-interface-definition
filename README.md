@@ -252,11 +252,17 @@ Now, let's explore how a malicious `Plugin` Contract attempts to cheat the syste
 ```cadence
 // Plugin.cdc
 access(all) contract Plugin: IPlugin {
-    access(all) fun anotherInvalidSwap(from: @FungibleToken.Vault): @FungibleToken.Vault {
-        let to: @FungibleToken = Vault._swap(from: <- from, expectedAmount: 0.01) // -> pre-condition failed: Not enough amount
-    }
     access(all) fun invalidSwap(from: @FungibleToken.Vault): @FungibleToken.Vault {
-        let to: @FungibleToken = Vault._swap(from: <- from, expectedAmount: someAmount) // Valid from IPlugin
+        let to: @FungibleToken = Vault._swap(
+            from: <- from,
+            expectedAmount: 0.01
+        ) // -> pre-condition failed: Not enough amount
+    }
+    access(all) fun anotherInvalidSwap(from: @FungibleToken.Vault): @FungibleToken.Vault {
+        let to: @FungibleToken = Vault._swap(
+            from: <- from,
+            expectedAmount: someAmount
+        ) // Valid from IPlugin
 
         to.withdraw(amount: to.balance / 2.0) // Cheat half of the amount
 
@@ -303,7 +309,6 @@ access(all) contract Consensus: IConsensus {
 
 ```cadence
 // Nodes.cdc
-define Consensus from IConsensus { }
 define Execution from IExecution {
     let exeAddr: Address = Execution.account.address
     assert(Nodes.validExecutions.exists(exeAddr), message: "Execution is not valid")
@@ -316,8 +321,6 @@ define Execution from IExecution {
 }
 
 access(all) contract Nodes {
-    access(Collection | Consensus | Execution | Verification) fun receivedTx();
-
     access(all) let validExecutions: [Address] = [0x01]
     access(all) let MINIMUM_STAKED: UFix64 = 1250000.0
 
